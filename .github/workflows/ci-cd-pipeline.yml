@@ -3,11 +3,11 @@ name: Build and Deploy Docker Image
 on:
   push:
     branches:
-      - main  # Trigger pipeline on push to the `main` branch
+      - main  # Run the pipeline on every push to the `main` branch
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Use an Ubuntu runner
+    runs-on: ubuntu-latest  # Use an Ubuntu image for the CI/CD runner
 
     steps:
     # Step 1: Checkout the code from the repository
@@ -23,7 +23,7 @@ jobs:
       run: |
         docker buildx build --file Dockerfile --tag prufwerk:latest .
 
-    # Step 4: Login to Docker Hub securely using GitHub Secrets
+    # Step 4: Login to Docker Hub using GitHub Secrets for username and password
     - name: Login to Docker Hub
       run: |
         echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
