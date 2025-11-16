@@ -111,12 +111,34 @@ fi
 step "Running smoke.sh against the cluster via port-forward..."
 kubectl port-forward deploy/prufwerk 8080:8080 >/tmp/prufwerk-pf.log 2>&1 &
 PF_PID=$!
-sleep 3
+
+# Wait for port-forward to become usable (simple retry loop)
+MAX_TRIES=10
+READY=0
+for i in $(seq 1 "${MAX_TRIES}"); do
+  if curl -sSf http://localhost:8080/health >/dev/null 2>&1; then
+    echo "  - Port-forward is ready (attempt ${i})."
+    READY=1
+    break
+  fi
+  echo "  - Waiting for port-forward to be ready (attempt ${i})..."
+  sleep 1
+done
+
+if [[ "${READY}" -ne 1 ]]; then
+  echo "[FATAL] Port-forward to prufwerk never became ready on :8080 after ${MAX_TRIES} attempts."
+  kill "${PF_PID}" 2>/dev/null || true
+  wait "${PF_PID}" 2>/dev/null || true
+  exit 1
+fi
+
 ./scripts/smoke.sh || {
   echo "[FATAL] smoke.sh failed against port-forwarded deployment"
   kill "${PF_PID}" 2>/dev/null || true
+  wait "${PF_PID}" 2>/dev/null || true
   exit 1
 }
+
 kill "${PF_PID}" 2>/dev/null || true
 wait "${PF_PID}" 2>/dev/null || true
 
