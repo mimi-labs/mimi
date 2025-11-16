@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
+# set -o pipefail   # (disabled for Windows/WSL)
 
-# Prefer regular docker; fallback to sudo docker if this shell lacks access.
-if docker version >/dev/null 2>&1; then
-  DOCKER="docker"
-else
-  DOCKER="sudo docker"
-fi
+# Use docker directly (user should be in docker group for passwordless access)
+DOCKER="docker"
 export DOCKER
 
 free_port_8080() {
   # kill any local process bound to :8080
-  (command -v fuser >/dev/null 2>&1 && sudo fuser -k 8080/tcp >/dev/null 2>&1) || true
   (command -v lsof  >/dev/null 2>&1 && lsof -ti :8080 | xargs -r kill -9) || true
   # stop any container mapping 8080
   $DOCKER ps --format '{{.ID}} {{.Ports}}' | awk '/:8080->/ {print $1}' | xargs -r $DOCKER rm -f >/dev/null 2>&1 || true

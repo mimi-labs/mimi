@@ -49,7 +49,7 @@ CLUSTER_NAME="prufwerk"
 step "Ensuring kind cluster '$CLUSTER_NAME' exists..."
 if ! kind get clusters | grep -q "^${CLUSTER_NAME}$"; then
   echo "  - Creating kind cluster '${CLUSTER_NAME}'..."
-  kind create cluster --name "${CLUSTER_NAME}"
+     kind create cluster --name "${CLUSTER_NAME}" --image kindest/node:v1.28.0
 else
   echo "  - kind cluster '${CLUSTER_NAME}' already exists."
 fi
@@ -69,7 +69,7 @@ kubectl rollout status deployment prufwerk
 step "Ensuring Kyverno is installed..."
 if ! kubectl get ns kyverno >/dev/null 2>&1; then
   echo "  - Installing Kyverno (this may take ~1–2 minutes)..."
-  kubectl create -f https://github.com/kyverno/kyverno/releases/download/v1.12.5/release.yaml
+  kubectl create -f https://github.com/kyverno/kyverno/releases/download/v1.11.1/install.yaml
 else
   echo "  - Kyverno namespace already exists."
 fi

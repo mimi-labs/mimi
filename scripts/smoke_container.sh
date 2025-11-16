@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Use exported DOCKER if present; else detect now.
-DOCKER_BIN="${DOCKER:-}"
-if [[ -z "$DOCKER_BIN" ]]; then
-  if docker version >/dev/null 2>&1; then
-    DOCKER_BIN="docker"
-  else
-    DOCKER_BIN="sudo docker"
-  fi
-fi
+# Use exported DOCKER if present; else use docker directly (user should be in docker group)
+DOCKER_BIN="${DOCKER:-docker}"
 
 name="prufwerk"
 img="prufwerk:local"
