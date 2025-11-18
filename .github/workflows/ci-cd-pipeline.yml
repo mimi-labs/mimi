@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Kaniko + ECR)
+name: CI/CD Pipeline (Kaniko + ECR + SBOM)
 
 on:
   push:
@@ -22,8 +22,8 @@ jobs:
         go vet ./...
         go test -v ./...
 
-  build-and-push-ecr:
-    name: Build (Kaniko) and Push to ECR
+  build-push-scan:
+    name: Build, Push, and SBOM
     runs-on: ubuntu-latest
     needs: test
     permissions:
@@ -41,23 +41,42 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # Kaniko Action: Dockerless Build
-    - name: Build and Push to ECR with Kaniko
+    # 1. Build and Push (Kaniko)
+    - name: Build and Push to ECR
       id: build-image
       uses: aevea/kaniko-action@v3.0.0
       with:
         registry: ${{ secrets.ECR_REGISTRY_URI }}
         image: ${{ secrets.ECR_REPOSITORY_NAME }}
-        # Push 'latest' and the Git commit SHA
         tags: |
           latest
           ${{ github.sha }}
-        # Capture digest for S3.8 Attestation
         digest_file: /tmp/image-digest
 
+    # 2. Capture Digest (Proof of Existence)
     - name: Capture Image Digest
       id: capture-digest
       run: |
         DIGEST=$(cat /tmp/image-digest)
         echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
         echo "Image pushed with Digest: $DIGEST"
+
+    # 3. Install Syft
+    - name: Install Syft
+      run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+    # 4. Generate SBOM (Scanning the artifact we just pushed)
+    - name: Generate SBOM from ECR
+      env:
+        # We use the exact digest we just pushed to be atomic
+        IMAGE_URI: ${{ secrets.ECR_REGISTRY_URI }}/${{ secrets.ECR_REPOSITORY_NAME }}@${{ env.IMAGE_DIGEST }}
+      run: |
+        echo "Scanning image: $IMAGE_URI"
+        syft registry:${IMAGE_URI} -o spdx-json > image-sbom.spdx.json
+
+    # 5. Upload SBOM
+    - name: Upload SBOM Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: image-sbom
+        path: image-sbom.spdx.json
