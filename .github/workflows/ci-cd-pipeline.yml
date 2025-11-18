@@ -34,6 +34,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
+    # 1. Configure AWS Credentials
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -41,40 +42,43 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # 1. Build and Push (Kaniko)
+    # 2. Login to ECR (CRITICAL for Kaniko Auth)
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # 3. Build and Push (Kaniko - int128 Gold Standard)
     - name: Build and Push to ECR
       id: build-image
-      uses: aevea/kaniko-action@v3.0.0
+      uses: int128/kaniko-action@v1
       with:
-        registry: ${{ secrets.ECR_REGISTRY_URI }}
-        image: ${{ secrets.ECR_REPOSITORY_NAME }}
+        push: true
+        # We pass the full URI in the tags
         tags: |
-          latest
-          ${{ github.sha }}
-        digest_file: /tmp/image-digest
+          ${{ secrets.ECR_REGISTRY_URI }}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
+          ${{ secrets.ECR_REGISTRY_URI }}/${{ secrets.ECR_REPOSITORY_NAME }}:${{ github.sha }}
 
-    # 2. Capture Digest (Proof of Existence)
+    # 4. Capture Digest (Using Output from int128)
     - name: Capture Image Digest
-      id: capture-digest
       run: |
-        DIGEST=$(cat /tmp/image-digest)
+        DIGEST="${{ steps.build-image.outputs.digest }}"
         echo "IMAGE_DIGEST=$DIGEST" >> $GITHUB_ENV
         echo "Image pushed with Digest: $DIGEST"
 
-    # 3. Install Syft
+    # 5. Install Syft
     - name: Install Syft
       run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
-    # 4. Generate SBOM (Scanning the artifact we just pushed)
+    # 6. Generate SBOM (Scanning the artifact we just pushed)
     - name: Generate SBOM from ECR
       env:
-        # We use the exact digest we just pushed to be atomic
+        # Construct the atomic reference using the captured digest
         IMAGE_URI: ${{ secrets.ECR_REGISTRY_URI }}/${{ secrets.ECR_REPOSITORY_NAME }}@${{ env.IMAGE_DIGEST }}
       run: |
         echo "Scanning image: $IMAGE_URI"
         syft registry:${IMAGE_URI} -o spdx-json > image-sbom.spdx.json
 
-    # 5. Upload SBOM
+    # 7. Upload SBOM
     - name: Upload SBOM Artifact
       uses: actions/upload-artifact@v4
       with:
