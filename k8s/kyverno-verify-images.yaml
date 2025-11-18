@@ -1,0 +1,34 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-signed-images-default
+spec:
+  validationFailureAction: Enforce
+  background: false
+  failurePolicy: Fail
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-signed-images
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - default
+      verifyImages:
+        - imageReferences:
+            - "docker.io/seejovin93/prufwerk*"
+          required: true
+          # For now: do NOT enforce digest, and do NOT mutate to digest.
+          mutateDigest: false
+          verifyDigest: false
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3UeE9nhzZBsJGV223usL7odOio8/
+                      7RIFle1R51+K8+FIYD9+s55pW7f47SOcjIR9zls2i7pH2su93tufRdluHg==
+                      -----END PUBLIC KEY-----

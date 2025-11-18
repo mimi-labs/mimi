@@ -1,0 +1,45 @@
+name: Source SBOM and vulnerability scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  sbom-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM for source directory (SPDX JSON)
+        run: |
+          syft dir:. -o spdx-json > prufwerk-sbom.spdx.json
+
+      - name: Upload source SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-source-spdx
+          path: prufwerk-sbom.spdx.json
+
+      - name: Scan SBOM with Grype (fail on critical) and save JSON report
+        run: |
+          grype sbom:prufwerk-sbom.spdx.json -o json --fail-on critical \
+            | tee prufwerk-sbom-grype.json
+
+      - name: Upload source vuln scan report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-source-grype-json
+          path: prufwerk-sbom-grype.json
