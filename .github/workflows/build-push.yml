@@ -6,14 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # Required for OIDC authentication
-  contents: read    # Required to checkout code
+  id-token: write
+  contents: read
 
 env:
   AWS_REGION: us-east-1
-  # The Role we created in S3.10
   IAM_ROLE_ARN: arn:aws:iam::243102737465:role/HeimdallGitHubActionRole
-  # Repositories created in S3.9/S3.11
   ECR_REPO_VENDOR: heimdall-gateway
   ECR_REPO_CUSTOMER: custody-reference-app
 
@@ -24,37 +22,26 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Install Cosign (The Signing Tool)
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.7.0
 
-      # 2. Log in to AWS using OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.IAM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Login to ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4. Build, Push, and SIGN
       - name: Build, Push and Sign
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI=$REGISTRY/$ECR_REPO_VENDOR:$IMAGE_TAG
-          
-          # A. Build
           docker build -t $IMAGE_URI .
-          
-          # B. Push
           docker push $IMAGE_URI
-          
-          # C. Sign (Keyless OIDC)
           cosign sign --yes $IMAGE_URI
-          
           echo "::notice::Image Signed: $IMAGE_URI"
