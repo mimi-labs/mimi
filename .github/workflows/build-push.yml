@@ -48,4 +48,4 @@ jobs:
           echo "::notice::Heimdall Image Pushed: $REGISTRY/$ECR_REPO_VENDOR:$IMAGE_TAG"
 
       # 4. (Placeholder) Build Customer App
-      # We will add this later when we have the custody-app code ready.
+      # We will add this later when we have the custody-app code read
