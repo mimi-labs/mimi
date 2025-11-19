@@ -1,29 +1,12 @@
-name: Heimdall Factory Build
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  AWS_REGION: us-east-1
-  IAM_ROLE_ARN: arn:aws:iam::243102737465:role/HeimdallGitHubActionRole
-  ECR_REPO_VENDOR: heimdall-gateway
-  ECR_REPO_CUSTOMER: custody-reference-app
-
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    steps:
+steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.7.0
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0.15.10
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -35,13 +18,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, Push and Sign
+      - name: Build, Push, Sign, and Attest
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI=$REGISTRY/$ECR_REPO_VENDOR:$IMAGE_TAG
+          
+          # 1. Build & Push
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
+          
+          # 2. Sign Image (The Stamp)
           cosign sign --yes $IMAGE_URI
-          echo "::notice::Image Signed: $IMAGE_URI"
+          
+          # 3. Generate SBOM (The Ingredients)
+          # We generate it in SPDX format
+          syft $IMAGE_URI -o spdx-json --file sbom.spdx.json
+          
+          # 4. Attest SBOM (Staple the Ingredients to the Image)
+          cosign attest --yes --predicate sbom.spdx.json --type spdx $IMAGE_URI
+          
+          echo "::notice::Image Signed & Attested: $IMAGE_URI"
