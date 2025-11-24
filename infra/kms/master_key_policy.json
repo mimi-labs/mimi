@@ -1,0 +1,24 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RestrictDecryptionToAttestedEnclave",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/NitroEnclaveExecutionRole"
+      },
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:RecipientAttestation:ImageSha384": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "StringLike": {
+          "kms:RecipientAttestation:PCRs": [
+            "*:3:000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          ]
+        }
+      }
+    }
+  ]
+}
