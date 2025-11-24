@@ -1,0 +1,11 @@
+[package]
+name = "mimi-enclave-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Dependencies will be added in Phase 1.
+# For now, we verify the algorithmic logic.
