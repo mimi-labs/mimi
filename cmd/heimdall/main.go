@@ -77,7 +77,9 @@ func bridgeToEnclave(req SigningRequest) ([]byte, error) {
 
 	// STRATEGY: Try VSOCK (Real Enclave) first. If it fails, fallback to TCP (Mock).
 	// This allows the same code to run on your $6 VPS and the $120 AWS Nitro.
-	conn, err = vsock.Dial(EnclaveCID, EnclavePort)
+
+	// FIX APPLIED: Added 'nil' as the 3rd argument for vsock.Dial
+	conn, err = vsock.Dial(EnclaveCID, EnclavePort, nil)
 	if err != nil {
 		// FALLBACK: Development Mode (Docker Mock)
 		// This saves you $120/mo during Dev
